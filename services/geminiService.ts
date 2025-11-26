@@ -2,7 +2,9 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Attraction, GeneratedItinerary } from "../types";
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.GEMINI_API_KEY || '';
+console.log('Gemini API Key configured:', apiKey ? 'YES' : 'NO');
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Searches for top attractions in a given location using Gemini with Google Search Grounding.
