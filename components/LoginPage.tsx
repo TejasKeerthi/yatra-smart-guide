@@ -29,17 +29,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestAcc
       onLoginSuccess(user);
     } catch (error: any) {
       console.error("Login failed", error);
-      
-      // Parse meaningful error
-      if (error.code === 'auth/unauthorized-domain') {
-        setError('This domain is not authorized. Please add it in Firebase Console > Authentication > Settings.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in cancelled.');
-      } else if (error.code === 'auth/operation-not-allowed') {
-        setError('Provider is disabled. Enable it in Firebase Console.');
-      } else {
-        setError(error.message || "Unable to sign in. Please try again.");
-      }
+      setError("Unable to sign in. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -61,15 +51,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestAcc
       onLoginSuccess(user);
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/invalid-credential') {
-        setError("Invalid email or password.");
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError("Email already registered. Try signing in.");
-      } else if (err.code === 'auth/weak-password') {
-        setError("Password should be at least 6 characters.");
-      } else {
-        setError(err.message || "Authentication failed.");
-      }
+      setError("Authentication failed.");
     } finally {
       setIsLoading(false);
     }

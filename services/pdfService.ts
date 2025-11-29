@@ -1,3 +1,4 @@
+
 import { jsPDF } from "jspdf";
 import { GeneratedItinerary } from "../types";
 
@@ -14,9 +15,12 @@ export const downloadItineraryPDF = (itinerary: GeneratedItinerary, locationName
     doc.setFont("helvetica", fontStyle);
     doc.setTextColor(color[0], color[1], color[2]);
     
+    // Check for empty text to avoid splitTextToSize error
+    if (!text) return;
+
     const lines = doc.splitTextToSize(text, maxLineWidth);
     doc.text(lines, margin, y);
-    y += lines.length * (fontSize * 0.4) + 6; // Line height spacing
+    y += lines.length * (fontSize * 0.4) + 2; // Line height spacing
     
     // Check for page break
     if (y > doc.internal.pageSize.getHeight() - 20) {
@@ -25,14 +29,35 @@ export const downloadItineraryPDF = (itinerary: GeneratedItinerary, locationName
     }
   };
 
+  // Helper for bullet points
+  const addBullet = (label: string, content: string) => {
+    if (!content) return;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(50, 50, 50);
+    doc.text(`• ${label}:`, margin, y);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    const lines = doc.splitTextToSize(content, maxLineWidth - 35);
+    doc.text(lines, margin + 35, y);
+    y += lines.length * 4 + 1;
+
+    if (y > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        y = 20;
+    }
+  }
+
   // Header
   addText(`Yatra Travel Guide: ${locationName}`, 24, "bold", [13, 148, 136]); // Teal color
   y += 5;
   
   // Title & Overview
   addText(itinerary.title, 18, "bold");
-  addText(itinerary.overview, 12, "italic", [80, 80, 80]);
-  y += 10;
+  y += 3;
+  addText(itinerary.overview, 11, "italic", [80, 80, 80]);
+  y += 8;
   
   // Line separator
   doc.setDrawColor(200, 200, 200);
@@ -41,25 +66,30 @@ export const downloadItineraryPDF = (itinerary: GeneratedItinerary, locationName
   // Days
   itinerary.days.forEach((day) => {
     addText(`Day ${day.day}`, 16, "bold", [15, 23, 42]); // Slate 900
+    y += 2;
     
     day.segments.forEach((segment) => {
       // Time & Title
       const header = `${segment.timeOfDay.toUpperCase()} - ${segment.title}`;
-      addText(header, 12, "bold", [50, 50, 50]);
+      doc.setFillColor(245, 245, 245);
+      doc.rect(margin - 2, y - 5, pageWidth - (margin*2) + 4, 8, 'F');
+      addText(header, 11, "bold", [0, 0, 0]);
+      y += 2;
       
       // Details
-      addText(segment.description, 10, "normal", [80, 80, 80]);
-      
-      if (segment.location) {
-        addText(`Location: ${segment.location}`, 9, "italic", [100, 100, 100]);
-        y -= 2; // Tighten spacing
-      }
-      
-      if (segment.tips) {
-        addText(`Tip: ${segment.tips}`, 9, "italic", [217, 119, 6]); // Amber
-      }
-      
-      y += 5; // Spacing between segments
+      addText(segment.description, 10, "normal", [40, 40, 40]);
+      y += 2;
+
+      // Insights
+      addBullet("Food", segment.foodRecommendations);
+      addBullet("Hidden Gems", segment.hiddenGems);
+      addBullet("Insider Tips", segment.insiderTips);
+      addBullet("Transport", segment.transportation);
+      addBullet("Safety", segment.safety);
+      addBullet("Budget", segment.budget);
+      if(segment.addOns) addBullet("Add-ons", segment.addOns);
+
+      y += 6; // Spacing between segments
     });
     
     y += 5; // Spacing between days

@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+
+import React, { useState, useCallback, useEffect, Component, ReactNode } from 'react';
 import { Search, MapPin, Sparkles, ArrowRight, Loader2, LogOut, User as UserIcon, Info, Moon, Sun } from 'lucide-react';
 import { AppState, Attraction, GeneratedItinerary } from './types';
 import { searchAttractionsInLocation, generateTripItinerary } from './services/geminiService';
@@ -50,13 +51,22 @@ const HeroSlideshow: React.FC = () => {
 };
 
 // Error Boundary Component to prevent white screen crashes
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: {children: React.ReactNode}) {
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
@@ -470,6 +480,7 @@ const AppContent: React.FC = () => {
             locationName={location}
             onReset={handleReset}
             darkMode={darkMode}
+            coordinates={attractions[0]?.coordinates} // Pass first attraction coords for weather
           />
         )}
 

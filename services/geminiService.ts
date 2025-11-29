@@ -1,22 +1,16 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Attraction, GeneratedItinerary } from "../types";
 
 // Initialize Gemini Client
-const apiKey = process.env.GEMINI_API_KEY || '';
-console.log('Gemini API Key configured:', apiKey ? 'YES' : 'NO');
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Searches for top attractions in a given location using Gemini with Google Search Grounding.
- * Note: When using tools, we cannot use responseSchema, so we parse JSON manually.
  */
 export const searchAttractionsInLocation = async (location: string): Promise<Attraction[]> => {
   const modelId = "gemini-2.5-flash"; 
 
-  // Optimized for speed: 
-  // 1. Reduced item count from 10 to 8.
-  // 2. Requested single, concise review.
-  // 3. Constrained description length.
   const prompt = `Fast search: Find 8 top tourist attractions in ${location}, India. 
   Use Google Search to get real-time info.
   
@@ -49,16 +43,13 @@ export const searchAttractionsInLocation = async (location: string): Promise<Att
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }], // Enable Search Grounding
-        temperature: 0.3, // Slightly lower temp for faster/more deterministic output
+        temperature: 0.3,
       },
     });
 
-    // Extract JSON from potential Markdown formatting
     let jsonStr = response.text || "[]";
-    // Remove markdown code blocks if present
     jsonStr = jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    // Find the array brackets in case there is conversational text
     const arrayStart = jsonStr.indexOf('[');
     const arrayEnd = jsonStr.lastIndexOf(']');
     
@@ -75,8 +66,7 @@ export const searchAttractionsInLocation = async (location: string): Promise<Att
 };
 
 /**
- * Generates a detailed itinerary based on selected attractions.
- * We keep Schema here for strict structural validation of the complex itinerary object.
+ * Generates a detailed itinerary with local insights.
  */
 export const generateTripItinerary = async (
   location: string,
@@ -84,19 +74,32 @@ export const generateTripItinerary = async (
 ): Promise<GeneratedItinerary> => {
   const modelId = "gemini-2.5-flash"; 
   
-  // Pass the enriched attraction data (which has real hours/ratings) to the planner
   const attractionsContext = selectedAttractions.map(a => 
     `${a.name} (Hours: ${a.openingHours}, Location: ${a.coordinates.lat},${a.coordinates.lng})`
   ).join("\n");
   
-  const prompt = `Create a logical, efficient travel itinerary for visiting these places in ${location}:
+  const prompt = `You are Yatra AI, an India-focused travel planning assistant.
+  For the selected city ${location} and places below, generate a complete itinerary.
+  
+  Attractions Selected:
   ${attractionsContext}
   
-  Group visits by proximity. Suggest generic lunch/dinner spots near attractions.
+  Group visits by proximity.
   
-  For every segment:
-  1. Provide coordinates.
-  2. Provide "travelEstimate" (e.g., "15 min drive") from previous location.
+  CRITICAL INSTRUCTION: 
+  1. Do NOT mix information. Use the specific fields provided in the schema.
+  2. For "suggestedStays", recommend 2 distinct accommodation options (Hotel, Resort, Hostel, or Camp) that are convenient for that specific day's location.
+  
+  Field Requirements:
+  - description: Only describe the place and what to do there.
+  - foodRecommendations: Specific local famous food spots (0-2km).
+  - hiddenGems: Lesser-known spots nearby.
+  - insiderTips: Best time to visit, crowd info, what to avoid.
+  - transportation: Metro/Bus availability and estimated Auto/Cab fares.
+  - safety: Tourist scams, night safety notes, traffic warnings.
+  - budget: Cheap food spots, entry fees.
+  - addOns: Walkable add-on places nearby.
+  - travelEstimate: Time & Distance from previous spot (e.g. "15 min auto ride").
   
   Return strictly JSON matching the schema.`;
 
@@ -111,6 +114,20 @@ export const generateTripItinerary = async (
           type: Type.OBJECT,
           properties: {
             day: { type: Type.INTEGER },
+            suggestedStays: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  type: { type: Type.STRING },
+                  rating: { type: Type.NUMBER },
+                  priceRange: { type: Type.STRING },
+                  description: { type: Type.STRING }
+                },
+                required: ["name", "type", "rating", "priceRange", "description"]
+              }
+            },
             segments: {
               type: Type.ARRAY,
               items: {
@@ -120,8 +137,17 @@ export const generateTripItinerary = async (
                   title: { type: Type.STRING },
                   description: { type: Type.STRING },
                   location: { type: Type.STRING },
-                  tips: { type: Type.STRING },
+                  
+                  // New Separated Fields
+                  foodRecommendations: { type: Type.STRING },
+                  hiddenGems: { type: Type.STRING },
+                  insiderTips: { type: Type.STRING },
+                  transportation: { type: Type.STRING },
                   travelEstimate: { type: Type.STRING },
+                  safety: { type: Type.STRING },
+                  budget: { type: Type.STRING },
+                  addOns: { type: Type.STRING },
+
                   coordinates: {
                     type: Type.OBJECT,
                     properties: {
@@ -131,11 +157,15 @@ export const generateTripItinerary = async (
                     required: ["lat", "lng"]
                   },
                 },
-                required: ["timeOfDay", "title", "description", "coordinates"]
+                required: [
+                  "timeOfDay", "title", "description", "coordinates", 
+                  "foodRecommendations", "hiddenGems", "insiderTips", 
+                  "transportation", "safety", "budget", "addOns"
+                ]
               }
             }
           },
-          required: ["day", "segments"]
+          required: ["day", "segments", "suggestedStays"]
         }
       }
     },
@@ -149,7 +179,7 @@ export const generateTripItinerary = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        temperature: 0.5,
+        temperature: 0.4,
       },
     });
 
