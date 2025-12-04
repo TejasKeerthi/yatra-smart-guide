@@ -1,9 +1,30 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Attraction, GeneratedItinerary } from "../types";
 
+// Safe API Key retrieval for various environments (Vite, Raw HTML, Node)
+const getApiKey = () => {
+  try {
+    // Check Vite environment
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_KEY;
+    }
+  } catch(e) {}
+  
+  try {
+    // Check Node/Process environment
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
+  } catch(e) {}
+
+  // Fallback (User Provided Key for Demo)
+  return "AIzaSyAepE0IsMmaZqdC9ACVI4nyoGOtib-P3_M";
+};
+
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
  * Searches for top attractions in a given location using Gemini with Google Search Grounding.
@@ -11,7 +32,13 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export const searchAttractionsInLocation = async (location: string): Promise<Attraction[]> => {
   const modelId = "gemini-2.5-flash"; 
 
-  const prompt = `Fast search: Find 8 top tourist attractions in ${location}, India. 
+  const prompt = `Fast search: Find 8 top tourist attractions in India matching the query: "${location}". 
+  
+  Context:
+  - If the query is a city (e.g. "Delhi"), find top general attractions there.
+  - If the query is a CATEGORY (e.g. "Historical sites", "Museums", "Temples"), find the best examples of that category in the specified city or across India if no city is named.
+  - If the query is "Category in City" (e.g. "Museums in Mumbai"), strictly find that category.
+
   Use Google Search to get real-time info.
   
   For each attraction:
@@ -79,7 +106,7 @@ export const generateTripItinerary = async (
   ).join("\n");
   
   const prompt = `You are Yatra AI, an India-focused travel planning assistant.
-  For the selected city ${location} and places below, generate a complete itinerary.
+  For the selected city/area "${location}" and places below, generate a complete itinerary.
   
   Attractions Selected:
   ${attractionsContext}

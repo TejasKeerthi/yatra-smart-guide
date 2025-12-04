@@ -1,6 +1,5 @@
-
 import React, { useState, useCallback, useEffect, Component, ReactNode } from 'react';
-import { Search, MapPin, Sparkles, ArrowRight, Loader2, LogOut, User as UserIcon, Info, Moon, Sun } from 'lucide-react';
+import { Search, MapPin, Sparkles, ArrowRight, Loader2, LogOut, User as UserIcon, Info, Moon, Sun, Plane, Map } from 'lucide-react';
 import { AppState, Attraction, GeneratedItinerary } from './types';
 import { searchAttractionsInLocation, generateTripItinerary } from './services/geminiService';
 import { getItineraryFromCloud } from './services/shareService';
@@ -46,6 +45,61 @@ const HeroSlideshow: React.FC = () => {
           <div className="absolute inset-0 bg-black/20" />
         </div>
       ))}
+    </div>
+  );
+};
+
+// --- Dynamic Loading Component ---
+const LoadingScreen: React.FC<{ messages: string[] }> = ({ messages }) => {
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    // Rotate messages every 2 seconds
+    const msgTimer = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % messages.length);
+    }, 2000);
+
+    // Fake progress bar
+    const progressTimer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 95) return prev;
+        // Slower progress as it gets higher
+        const increment = Math.max(0.5, (100 - prev) / 40);
+        return prev + increment;
+      });
+    }, 100);
+
+    return () => {
+      clearInterval(msgTimer);
+      clearInterval(progressTimer);
+    };
+  }, [messages]);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-500 z-10 relative px-4 text-center">
+      <div className="relative mb-8">
+        <div className="absolute inset-0 bg-brand-400/30 rounded-full blur-2xl animate-pulse"></div>
+        <div className="relative w-24 h-24 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center shadow-2xl">
+           <Plane className="text-brand-400 animate-pulse" size={40} />
+           <div className="absolute inset-0 border-t-2 border-brand-400 rounded-full animate-spin"></div>
+        </div>
+      </div>
+      
+      <h3 className="text-3xl font-bold text-slate-800 dark:text-slate-100 drop-shadow-sm mb-2 h-10 transition-all duration-300">
+        {messages[msgIndex]}
+      </h3>
+      
+      <div className="w-full max-w-xs h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-6">
+        <div 
+          className="h-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-100 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      
+      <p className="text-slate-500 dark:text-slate-400 mt-4 text-sm font-medium tracking-wide">
+        Powered by Gemini AI
+      </p>
     </div>
   );
 };
@@ -265,18 +319,6 @@ const AppContent: React.FC = () => {
     setUser({ uid: 'guest', displayName: 'Guest Traveler', photoURL: null });
   };
 
-  // Render Helpers
-  const renderLoading = (message: string) => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-500 z-10 relative">
-      <div className="relative">
-        <div className="absolute inset-0 bg-brand-400 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-        <Loader2 size={64} className="text-brand-500 dark:text-brand-400 animate-spin relative z-10" />
-      </div>
-      <h3 className="mt-8 text-2xl font-bold text-slate-800 dark:text-slate-100 drop-shadow-sm">{message}</h3>
-      <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">Powered by Gemini AI</p>
-    </div>
-  );
-
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -358,7 +400,9 @@ const AppContent: React.FC = () => {
 
       <main className={`min-h-screen transition-all duration-500 ${appState === AppState.IDLE ? 'flex items-center justify-center px-4' : 'pt-24 px-6 max-w-7xl mx-auto'}`}>
         
-        {isLoadingShared && renderLoading("Loading shared trip...")}
+        {isLoadingShared && (
+          <LoadingScreen messages={["Retrieving trip from the cloud...", "Loading destination map...", "Getting everything ready..."]} />
+        )}
 
         {appState === AppState.IDLE && !isLoadingShared && (
           <div className="relative z-10 w-full max-w-4xl text-center text-white animate-in slide-up fade-in duration-700">
@@ -385,7 +429,7 @@ const AppContent: React.FC = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Where do you want to go? (e.g. Goa, Delhi)"
+                  placeholder="Search by city (e.g. 'Delhi') or category (e.g. 'Museums in Jaipur')"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   className="w-full bg-transparent border-none text-xl text-white placeholder-white/60 px-4 py-4 focus:ring-0 outline-none font-medium"
@@ -416,7 +460,13 @@ const AppContent: React.FC = () => {
           </div>
         )}
 
-        {appState === AppState.SEARCHING && renderLoading(`Scouting best spots in ${location}...`)}
+        {appState === AppState.SEARCHING && (
+          <LoadingScreen messages={[
+            `Scouting best spots in ${location}...`, 
+            "Checking ratings and reviews...", 
+            "Filtering for top-rated experiences..."
+          ]} />
+        )}
 
         {appState === AppState.SELECTING && (
           <div className="animate-in slide-in-from-bottom-8 duration-500 pb-24">
@@ -472,7 +522,16 @@ const AppContent: React.FC = () => {
           </div>
         )}
 
-        {appState === AppState.PLANNING && renderLoading("Designing your perfect route and schedule...")}
+        {appState === AppState.PLANNING && (
+          <LoadingScreen messages={[
+            "Designing your perfect route...", 
+            "Finding hidden gems nearby...", 
+            "Locating best local food spots...", 
+            "Calculating travel times...", 
+            "Checking safety & budget tips...",
+            "Finalizing your itinerary..."
+          ]} />
+        )}
 
         {appState === AppState.VIEWING_PLAN && itinerary && (
           <ItineraryView 
